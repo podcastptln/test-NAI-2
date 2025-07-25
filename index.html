@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Include SheetJS (xlsx.js) for Excel file handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -704,8 +706,8 @@
                 if (appState.activeTab === 1) {
                     contentHtml = `
                         <h3 class="text-lg font-semibold mb-2 required-dot">${aspectTitles[1]}</h3>
-                        <p class="text-sm text-slate-500 mb-4">Unggah file CSV dari Aset Operasi yang berisi data finansial. Pastikan format sesuai dengan templat (kolom "Metrik" dan "Nilai").</p>
-                        <input type="file" id="csv-upload" accept=".csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"/>
+                        <p class="text-sm text-slate-500 mb-4">Unggah file CSV atau XLSX dari Aset Operasi yang berisi data finansial. Pastikan format sesuai dengan templat (kolom "Metrik" dan "Nilai").</p>
+                        <input type="file" id="csv-upload" accept=".csv, .xlsx" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"/>
                         <div class="mt-2">
                            <a href="#" id="download-csv-template" class="text-sm text-cyan-600 hover:underline">Unduh Templat CSV</a>
                         </div>
@@ -724,8 +726,8 @@
                 } else if (appState.activeTab === 10) { // New tab for raw financial data
                     contentHtml = `
                         <h3 class="text-lg font-semibold mb-2 required-dot">${aspectTitles[10]}</h3>
-                        <p class="text-sm text-slate-500 mb-4">Unggah file CSV yang berisi data keuangan mentah (misalnya, laporan laba rugi, neraca). Pastikan format sesuai dengan templat.</p>
-                        <input type="file" id="raw-data-upload" accept=".csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"/>
+                        <p class="text-sm text-slate-500 mb-4">Unggah file CSV atau XLSX yang berisi data keuangan mentah (misalnya, laporan laba rugi, neraca). Pastikan format sesuai dengan templat.</p>
+                        <input type="file" id="raw-data-upload" accept=".csv, .xlsx" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"/>
                         <div class="mt-2">
                            <a href="#" id="download-raw-data-template" class="text-sm text-cyan-600 hover:underline">Unduh Templat Data Keuangan Mentah</a>
                         </div>
@@ -756,12 +758,17 @@
                 const file = event.target.files[0];
                 if (!file) return;
 
-                Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        if (results.data.length > 0 && results.meta.fields.includes('Metrik') && results.meta.fields.includes('Nilai')) {
-                            const financialData = results.data.reduce((acc, row) => {
+                if (file.name.endsWith('.xlsx')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet);
+
+                        if (json.length > 0 && json[0].Metrik !== undefined && json[0].Nilai !== undefined) {
+                            const financialData = json.reduce((acc, row) => {
                                 if(row['Metrik'] && row['Nilai']) {
                                     acc[row['Metrik']] = row['Nilai'];
                                 }
@@ -771,13 +778,40 @@
                             renderFormTabContent();
                             checkFormCompleteness();
                         } else {
-                            showModal('Format CSV Salah', 'Pastikan file CSV memiliki kolom "Metrik" dan "Nilai". Silakan gunakan templat yang disediakan.');
+                            showModal('Format XLSX Salah', 'Pastikan file XLSX memiliki kolom "Metrik" dan "Nilai" di sheet pertama.');
                         }
-                    },
-                    error: function(error) {
-                        showModal('Gagal Memproses CSV', `Terjadi kesalahan: ${error.message}`);
-                    }
-                });
+                    };
+                    reader.onerror = function(e) {
+                        showModal('Gagal Memuat File', 'Terjadi kesalahan saat membaca file XLSX. Pastikan file tidak rusak.');
+                        console.error('FileReader error for XLSX:', e);
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else if (file.name.endsWith('.csv')) {
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            if (results.data.length > 0 && results.meta.fields.includes('Metrik') && results.meta.fields.includes('Nilai')) {
+                                const financialData = results.data.reduce((acc, row) => {
+                                    if(row['Metrik'] && row['Nilai']) {
+                                        acc[row['Metrik']] = row['Nilai'];
+                                    }
+                                    return acc;
+                                }, {});
+                                appState.activeFormData[1] = financialData;
+                                renderFormTabContent();
+                                checkFormCompleteness();
+                            } else {
+                                showModal('Format CSV Salah', 'Pastikan file CSV memiliki kolom "Metrik" dan "Nilai". Silakan gunakan templat yang disediakan.');
+                            }
+                        },
+                        error: function(error) {
+                            showModal('Gagal Memproses CSV', `Terjadi kesalahan: ${error.message}`);
+                        }
+                    });
+                } else {
+                    showModal('Format File Tidak Didukung', 'Mohon unggah file dengan format .csv atau .xlsx.');
+                }
             }
 
             function handleRawDataUpload(event) {
@@ -791,20 +825,46 @@
 
                 console.log('File selected for raw data upload:', file.name); // Debug log
 
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const rawContent = e.target.result;
-                    appState.activeFormData[10] = { raw_data_content: rawContent };
-                    console.log('FileReader loaded raw data content, length:', rawContent.length); // Debug log
-                    renderFormTabContent(); // Re-render to show preview
-                    checkFormCompleteness();
-                };
-                reader.onerror = function(e) {
-                    showModal('Gagal Memuat File', 'Terjadi kesalahan saat membaca file. Pastikan file tidak rusak.');
-                    if (rawDataContentArea) rawDataContentArea.innerHTML = '<p class="text-red-500">Gagal memuat file.</p>';
-                    console.error('FileReader error:', e);
-                };
-                reader.readAsText(file);
+                if (file.name.endsWith('.xlsx')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        // Convert XLSX to CSV string for storage and consistent rendering
+                        const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+                        
+                        appState.activeFormData[10] = { raw_data_content: csvContent };
+                        console.log('FileReader loaded XLSX and converted to CSV string, length:', csvContent.length); // Debug log
+                        renderFormTabContent(); // Re-render to show preview
+                        checkFormCompleteness();
+                    };
+                    reader.onerror = function(e) {
+                        showModal('Gagal Memuat File', 'Terjadi kesalahan saat membaca file XLSX. Pastikan file tidak rusak.');
+                        if (rawDataContentArea) rawDataContentArea.innerHTML = '<p class="text-red-500">Gagal memuat file.</p>';
+                        console.error('FileReader error for XLSX:', e);
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else if (file.name.endsWith('.csv')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const rawContent = e.target.result;
+                        appState.activeFormData[10] = { raw_data_content: rawContent };
+                        console.log('FileReader loaded raw data content, length:', rawContent.length); // Debug log
+                        renderFormTabContent(); // Re-render to show preview
+                        checkFormCompleteness();
+                    };
+                    reader.onerror = function(e) {
+                        showModal('Gagal Memuat File', 'Terjadi kesalahan saat membaca file CSV. Pastikan file tidak rusak.');
+                        if (rawDataContentArea) rawDataContentArea.innerHTML = '<p class="text-red-500">Gagal memuat file.</p>';
+                        console.error('FileReader error for CSV:', e);
+                    };
+                    reader.readAsText(file);
+                } else {
+                    showModal('Format File Tidak Didukung', 'Mohon unggah file dengan format .csv atau .xlsx.');
+                    if (rawDataContentArea) rawDataContentArea.innerHTML = '<p class="text-red-500">Format file tidak didukung.</p>';
+                }
             }
 
             function renderRawDataTable(csvString) {
