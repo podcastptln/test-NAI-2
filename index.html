@@ -731,10 +731,8 @@
                         </div>
                         <div id="raw-data-preview" class="mt-4 p-4 border rounded-md bg-slate-50 ${data.raw_data_content ? '' : 'hidden'}">
                             <h4 class="font-semibold mb-2">Pratinjau Data Keuangan Mentah</h4>
-                            <div class="overflow-x-auto">
-                                <table id="raw-data-table" class="min-w-full text-sm">
-                                    <!-- Raw data table content will be injected here -->
-                                </table>
+                            <div class="overflow-x-auto" id="raw-data-content-area">
+                                <!-- Raw data table content will be injected here -->
                             </div>
                         </div>
                     `;
@@ -786,25 +784,52 @@
                 const file = event.target.files[0];
                 if (!file) return;
 
+                const rawDataPreview = document.getElementById('raw-data-preview');
+                const rawDataContentArea = document.getElementById('raw-data-content-area');
+                if (rawDataPreview) rawDataPreview.classList.remove('hidden');
+                if (rawDataContentArea) rawDataContentArea.innerHTML = '<p class="text-center text-slate-500">Memuat data...</p>';
+
+                console.log('File selected for raw data upload:', file.name); // Debug log
+
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const rawContent = e.target.result;
                     appState.activeFormData[10] = { raw_data_content: rawContent };
+                    console.log('FileReader loaded raw data content, length:', rawContent.length); // Debug log
                     renderFormTabContent(); // Re-render to show preview
                     checkFormCompleteness();
+                };
+                reader.onerror = function(e) {
+                    showModal('Gagal Memuat File', 'Terjadi kesalahan saat membaca file. Pastikan file tidak rusak.');
+                    if (rawDataContentArea) rawDataContentArea.innerHTML = '<p class="text-red-500">Gagal memuat file.</p>';
+                    console.error('FileReader error:', e);
                 };
                 reader.readAsText(file);
             }
 
             function renderRawDataTable(csvString) {
+                const tableContainer = document.getElementById('raw-data-content-area'); // Target the content area
+                if (!tableContainer) {
+                    console.error('raw-data-content-area element not found during Papa.parse complete callback.');
+                    return;
+                }
+                
+                // Clear any previous loading message
+                tableContainer.innerHTML = ''; 
+
                 Papa.parse(csvString, {
                     header: true,
                     skipEmptyLines: true,
                     complete: function(results) {
-                        const tableContainer = document.getElementById('raw-data-table');
-                        if (!tableContainer) return;
+                        console.log('Papa.parse complete for raw data. Results:', results); // Debug log
+                        
+                        if (results.errors.length > 0) {
+                            tableContainer.innerHTML = `<p class="text-red-500 text-sm">Gagal memuat data mentah: ${results.errors.map(e => e.message).join(', ')}</p>`;
+                            console.error('PapaParse errors for raw data:', results.errors);
+                            return;
+                        }
 
-                        let tableHtml = '';
+                        let tableHtml = `<table class="min-w-full text-sm">`; // Start table tag
                         if (results.data.length > 0) {
                             // Table Header
                             tableHtml += `<thead class="bg-slate-200"><tr>`;
@@ -817,7 +842,7 @@
                             results.data.forEach(row => {
                                 tableHtml += `<tr class="border-t border-slate-100">`;
                                 results.meta.fields.forEach(field => {
-                                    tableHtml += `<td class="px-2 py-1">${row[field]}</td>`; // Fixed: Changed rawTableHtml to tableHtml
+                                    tableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
                                 });
                                 tableHtml += `</tr>`;
                             });
@@ -825,7 +850,9 @@
                         } else {
                             tableHtml = `<p class="text-sm text-slate-500">Tidak ada data untuk ditampilkan.</p>`;
                         }
+                        tableHtml += `</table>`; // End table tag
                         tableContainer.innerHTML = tableHtml;
+                        console.log('Updated raw-data-content-area with parsed table.'); // Debug log
                     }
                 });
             }
@@ -986,38 +1013,8 @@
                                 } else if (aspectId === 10) {
                                     // Raw Financial Data
                                     if (data.raw_data_content) {
-                                        let rawDataTableHtml = '';
-                                        Papa.parse(data.raw_data_content, {
-                                            header: true,
-                                            skipEmptyLines: true,
-                                            complete: function(results) {
-                                                if (results.data.length > 0) {
-                                                    rawDataTableHtml += `<div class="overflow-x-auto"><table class="min-w-full text-sm border border-slate-200 rounded-md">`;
-                                                    // Table Header
-                                                    rawDataTableHtml += `<thead class="bg-slate-50"><tr>`;
-                                                    results.meta.fields.forEach(field => {
-                                                        rawDataTableHtml += `<th class="px-2 py-1 text-left">${field}</th>`;
-                                                    });
-                                                    rawDataTableHtml += `</tr></thead><tbody>`;
-
-                                                    // Table Body
-                                                    results.data.forEach(row => {
-                                                        rawDataTableHtml += `<tr class="border-t border-slate-100">`;
-                                                        results.meta.fields.forEach(field => {
-                                                            rawDataTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
-                                                        });
-                                                        rawDataTableHtml += `</tr>`;
-                                                    });
-                                                    rawDataTableHtml += `</tbody></table></div>`;
-                                                } else {
-                                                    rawDataTableHtml = `<p class="text-sm text-slate-500">Tidak ada data mentah untuk ditampilkan.</p>`;
-                                                }
-                                            },
-                                            error: function(error) {
-                                                rawDataTableHtml = `<p class="text-red-500 text-sm">Gagal memuat data mentah: ${error.message}</p>`;
-                                            }
-                                        });
-                                        aspectContentHtml = `<h4 class="font-semibold mb-2">Detail Data Keuangan Mentah</h4>${rawDataTableHtml}`;
+                                        // This div will be populated by renderRawDataTableReview
+                                        aspectContentHtml = `<h4 class="font-semibold mb-2">Detail Data Keuangan Mentah</h4><div id="raw-data-content-area-review" class="overflow-x-auto"></div>`;
                                     } else {
                                         aspectContentHtml = '<p class="text-sm text-slate-500">Tidak ada data keuangan mentah yang diunggah.</p>';
                                     }
@@ -1098,6 +1095,7 @@
                 `;
                 mainContent.innerHTML = content;
 
+                // Render financial chart if data is available
                 if (financialChart) {
                     financialChart.destroy();
                 }
@@ -1167,7 +1165,71 @@
                         });
                     }
                 }
+
+                // Render raw data table for review view if content exists
+                const rawDataReviewContent = memo.data[10]?.raw_data_content;
+                if (rawDataReviewContent) {
+                    renderRawDataTableReview(rawDataReviewContent);
+                }
             }
+
+            // Function to render raw data table specifically for the review view
+            function renderRawDataTableReview(csvString) {
+                const tableContainer = document.getElementById('raw-data-content-area-review');
+                if (!tableContainer) {
+                    console.error('raw-data-content-area-review element not found.');
+                    return;
+                }
+
+                tableContainer.innerHTML = '<p class="text-center text-slate-500">Memuat data...</p>'; // Show loading
+
+                Papa.parse(csvString, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        console.log('Papa.parse complete for review raw data. Results:', results);
+                        if (!tableContainer) { // Re-check in case element was removed during async operation
+                            console.error('raw-data-content-area-review element disappeared before Papa.parse completed.');
+                            return;
+                        }
+
+                        if (results.errors.length > 0) {
+                            tableContainer.innerHTML = `<p class="text-red-500 text-sm">Gagal memuat data mentah: ${results.errors.map(e => e.message).join(', ')}</p>`;
+                            console.error('PapaParse errors for review raw data:', results.errors);
+                            return;
+                        }
+
+                        let tableHtml = `<table class="min-w-full text-sm border border-slate-200 rounded-md">`;
+                        if (results.data.length > 0) {
+                            tableHtml += `<thead class="bg-slate-50"><tr>`;
+                            results.meta.fields.forEach(field => {
+                                tableHtml += `<th class="px-2 py-1 text-left">${field}</th>`;
+                            });
+                            tableHtml += `</tr></thead><tbody>`;
+
+                            results.data.forEach(row => {
+                                tableHtml += `<tr class="border-t border-slate-100">`;
+                                results.meta.fields.forEach(field => {
+                                    tableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
+                                });
+                                tableHtml += `</tr>`;
+                            });
+                            tableHtml += `</tbody>`;
+                        } else {
+                            tableHtml = `<p class="text-sm text-slate-500">Tidak ada data untuk ditampilkan.</p>`;
+                        }
+                        tableHtml += `</table>`;
+                        tableContainer.innerHTML = tableHtml;
+                        console.log('Updated raw-data-content-area-review with parsed table.');
+                    },
+                    error: function(error) { // PapaParse error for string parsing
+                        if (!tableContainer) return;
+                        tableContainer.innerHTML = `<p class="text-red-500 text-sm">Terjadi kesalahan saat memproses CSV: ${error.message}</p>`;
+                        console.error('PapaParse error in renderRawDataTableReview:', error);
+                    }
+                });
+            }
+
 
             // Main render function to control view
             function render() {
@@ -1261,32 +1323,31 @@
                     } else if (i === 10) { // Raw Financial Data
                         if (aspectData.raw_data_content) {
                             htmlContent += `<h3>Detail Data Keuangan Mentah</h3>`;
-                            // Parse CSV content for display in table
-                            let rawTableHtml = '';
-                            Papa.parse(aspectData.raw_data_content, {
+                            // Parse CSV content for display in table synchronously for DOCX
+                            const results = Papa.parse(aspectData.raw_data_content, {
                                 header: true,
-                                skipEmptyLines: true,
-                                complete: function(results) {
-                                    if (results.data.length > 0) {
-                                        rawTableHtml += `<table><thead><tr>`;
-                                        results.meta.fields.forEach(field => {
-                                            rawTableHtml += `<th>${field}</th>`;
-                                        });
-                                        rawTableHtml += `</tr></thead><tbody>`;
-                                        results.data.forEach(row => {
-                                            rawTableHtml += `<tr>`;
-                                            results.meta.fields.forEach(field => {
-                                                rawTableHtml += `<td>${row[field]}</td>`;
-                                            });
-                                            rawTableHtml += `</tr>`;
-                                        });
-                                        rawTableHtml += `</tbody></table>`;
-                                    } else {
-                                        rawTableHtml = `<p>Tidak ada data mentah untuk ditampilkan.</p>`;
-                                    }
-                                }
+                                skipEmptyLines: true
                             });
-                            htmlContent += rawTableHtml;
+
+                            if (results.errors.length > 0) {
+                                htmlContent += `<p style="color: red;">Gagal memuat data mentah untuk DOCX: ${results.errors.map(e => e.message).join(', ')}</p>`;
+                            } else if (results.data.length > 0) {
+                                htmlContent += `<table><thead><tr>`;
+                                results.meta.fields.forEach(field => {
+                                    htmlContent += `<th>${field}</th>`;
+                                });
+                                htmlContent += `</tr></thead><tbody>`;
+                                results.data.forEach(row => {
+                                    htmlContent += `<tr>`;
+                                    results.meta.fields.forEach(field => {
+                                        htmlContent += `<td>${row[field]}</td>`;
+                                    });
+                                    htmlContent += `</tr>`;
+                                });
+                                htmlContent += `</tbody></table>`;
+                            } else {
+                                htmlContent += `<p>Tidak ada data mentah untuk ditampilkan.</p>`;
+                            }
                         } else {
                             htmlContent += `<p>Tidak ada data keuangan mentah yang diunggah.</p>`;
                         }
@@ -1523,7 +1584,7 @@
                         memo.status = 'Disetujui';
                     } else {
                         // Mixed decisions or some 'Revisi'
-                        memo.status = 'Butuh Revisi'; 
+                        memo.status = 'Dalam Tinjauan'; 
                     }
                 } else {
                     memo.status = 'Dalam Tinjauan'; // Still pending review from others
