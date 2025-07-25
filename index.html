@@ -486,7 +486,7 @@
                         (m.status === 'Draf' || m.status === 'Dalam Tinjauan')
                     );
                 }
-
+                console.log(`Memos for ${appState.currentUserName} (${appState.currentUserRole}):`, memosForRole); // Added log
                 let content = `
                     <div class="bg-white shadow-md rounded-lg p-6">
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
@@ -817,7 +817,7 @@
                             results.data.forEach(row => {
                                 tableHtml += `<tr class="border-t border-slate-100">`;
                                 results.meta.fields.forEach(field => {
-                                    rawTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
+                                    tableHtml += `<td class="px-2 py-1">${row[field]}</td>`; // Fixed: Changed rawTableHtml to tableHtml
                                 });
                                 tableHtml += `</tr>`;
                             });
@@ -998,19 +998,19 @@
                                                     results.meta.fields.forEach(field => {
                                                         rawDataTableHtml += `<th class="px-2 py-1 text-left">${field}</th>`;
                                                     });
-                                                    rawTableHtml += `</tr></thead><tbody>`;
+                                                    rawDataTableHtml += `</tr></thead><tbody>`;
 
                                                     // Table Body
                                                     results.data.forEach(row => {
-                                                        rawTableHtml += `<tr class="border-t border-slate-100">`;
+                                                        rawDataTableHtml += `<tr class="border-t border-slate-100">`;
                                                         results.meta.fields.forEach(field => {
-                                                            rawTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
+                                                            rawDataTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
                                                         });
-                                                        rawTableHtml += `</tr>`;
+                                                        rawDataTableHtml += `</tr>`;
                                                     });
-                                                    rawTableHtml += `</tbody></table></div>`;
+                                                    rawDataTableHtml += `</tbody></table></div>`;
                                                 } else {
-                                                    rawTableHtml = `<p class="text-sm text-slate-500">Tidak ada data mentah untuk ditampilkan.</p>`;
+                                                    rawDataTableHtml = `<p class="text-sm text-slate-500">Tidak ada data mentah untuk ditampilkan.</p>`;
                                                 }
                                             },
                                             error: function(error) {
@@ -1481,6 +1481,9 @@
                         action: 'Diajukan'
                     });
                     
+                    console.log('Memo after submission:', memo); // Added for debugging
+                    console.log('All memos after submission:', appState.memos); // Added for debugging
+
                     showModal('Nota Diajukan', 'Nota Anda telah berhasil diajukan untuk ditinjau.');
                     renderDashboard();
                 }
