@@ -77,7 +77,12 @@
                             8: { 'content': 'Tingkat kepatuhan terhadap kelengkapan dokumen 100%. Kepatuhan internal dinilai tinggi.' }, 
                             9: { 'content': 'Proyek ini juga bertujuan untuk meningkatkan sentimen positif pemberitaan pasca isu lingkungan tahun lalu.' },
                             10: { 'raw_data_content': '' } // Initial empty raw data content
-                        }
+                        },
+                        history: [ // Initial history for existing memos
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString(), userId: 'pengusul1', action: 'Dibuat' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString(), userId: 'pengusul1', action: 'Diajukan' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString(), userId: 'peninjau1', action: 'Diperbarui oleh Peninjau (Setuju)' }
+                        ]
                     },
                     {
                         id: 2,
@@ -100,7 +105,13 @@
                             8: { 'content': 'Sesuai dengan GCG perusahaan.' }, 
                             9: { 'content': 'Peningkatan kapabilitas SDM dalam teknologi.' },
                             10: { 'raw_data_content': 'Tanggal,Pendapatan,Beban,Laba Bersih\n2023-01-01,100000,50000,50000\n2023-02-01,120000,60000,60000' }
-                        }
+                        },
+                        history: [
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString(), userId: 'pengusul2', action: 'Dibuat' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString(), userId: 'pengusul2', action: 'Diajukan' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 9)).toISOString(), userId: 'peninjau1', action: 'Diperbarui oleh Peninjau (Setuju)' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 8)).toISOString(), userId: 'peninjau2', action: 'Diperbarui oleh Peninjau (Setuju)' }
+                        ]
                     },
                     {
                         id: 3,
@@ -109,7 +120,10 @@
                         status: 'Draf',
                         submissionDate: null,
                         reviewers: [],
-                        data: {}
+                        data: {},
+                        history: [
+                            { timestamp: new Date().toISOString(), userId: 'pengusul1', action: 'Dibuat' }
+                        ]
                     },
                     {
                         id: 4,
@@ -132,7 +146,13 @@
                             8: { 'content': 'Kepatuhan terhadap GCG perlu diperjelas.'}, 
                             9: { 'content': 'Tidak ada aspek lain.'},
                             10: { 'raw_data_content': 'Tanggal,Aset,Liabilitas,Ekuitas\n2023-01-01,500000,200000,300000\n2023-02-01,550000,220000,330000' }
-                        }
+                        },
+                        history: [
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 20)).toISOString(), userId: 'pengusul2', action: 'Dibuat' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 20)).toISOString(), userId: 'pengusul2', action: 'Diajukan' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 19)).toISOString(), userId: 'peninjau1', action: 'Diperbarui oleh Peninjau (Tolak)' },
+                            { timestamp: new Date(new Date().setDate(new Date().getDate() - 18)).toISOString(), userId: 'peninjau2', action: 'Diperbarui oleh Peninjau (Tolak)' }
+                        ]
                     },
                 ],
                 activeView: 'login', // 'login', 'dashboard', 'form', 'review', 'archive_approved', 'archive_rejected', 'signup'
@@ -149,6 +169,10 @@
             const modalMessage = document.getElementById('modal-message');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             let financialChart = null;
+
+            // Inactivity timer variables
+            let inactivityTimeout;
+            const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes in milliseconds
 
             // Constants
             const aspectTitles = {
@@ -171,6 +195,24 @@
                 'Sinergi Solusi',
                 'Puncak Jaya Group'
             ];
+
+            // --- INACTIVITY TIMER FUNCTIONS ---
+            function resetInactivityTimer() {
+                clearTimeout(inactivityTimeout);
+                if (appState.isAuthenticated) { // Only set timer if user is logged in
+                    inactivityTimeout = setTimeout(() => {
+                        showModal('Sesi Berakhir', 'Anda telah otomatis keluar karena tidak ada aktivitas selama 15 menit.');
+                        handleLogout();
+                    }, INACTIVITY_LIMIT);
+                }
+            }
+
+            // Attach inactivity listeners
+            document.addEventListener('mousemove', resetInactivityTimer);
+            document.addEventListener('keydown', resetInactivityTimer);
+            document.addEventListener('click', resetInactivityTimer);
+            document.addEventListener('scroll', resetInactivityTimer);
+
 
             // --- MODAL FUNCTIONS ---
             function showModal(title, message) {
@@ -210,6 +252,7 @@
                     appState.currentUserRole = user.role;
                     appState.currentUserName = user.name;
                     appState.activeView = 'dashboard';
+                    resetInactivityTimer(); // Start timer on login
                     render();
                 } else {
                     errorEl.textContent = 'ID Pengguna atau Kata Sandi salah.';
@@ -222,6 +265,7 @@
                 appState.currentUserRole = null;
                 appState.currentUserName = null;
                 appState.activeView = 'login';
+                clearTimeout(inactivityTimeout); // Clear timer on logout
                 render();
             }
 
@@ -559,7 +603,10 @@
                         status: 'Draf', 
                         submissionDate: null,
                         reviewers: [], // Reviewers are assigned upon submission
-                        data: {} 
+                        data: {},
+                        history: [
+                            { timestamp: new Date().toISOString(), userId: appState.currentUserName, action: 'Dibuat' }
+                        ]
                     };
                     appState.memos.push(memo); // Add new memo to global state
                     appState.activeMemoId = memo.id;
@@ -1028,6 +1075,20 @@
                                 </ul>
                             ` : `<p class="text-sm text-slate-500">Belum ada peninjau.</p>`}
                         </div>
+
+                        <div class="mt-8 pt-6 border-t border-slate-200">
+                            <h3 class="text-xl font-semibold mb-4">Log Riwayat</h3>
+                            ${memo.history && memo.history.length > 0 ? `
+                                <ul class="space-y-2">
+                                    ${memo.history.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map(log => `
+                                        <li class="bg-slate-50 p-3 rounded-md border border-slate-200 text-sm">
+                                            <p class="font-medium">${log.action} oleh ${log.userId}</p>
+                                            <p class="text-xs text-slate-500">${new Date(log.timestamp).toLocaleString('id-ID')}</p>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            ` : `<p class="text-sm text-slate-500">Tidak ada riwayat aktivitas untuk nota ini.</p>`}
+                        </div>
                     </div>
                 `;
                 mainContent.innerHTML = content;
@@ -1107,6 +1168,7 @@
             function render() {
                 renderHeader();
                 if (appState.isAuthenticated) {
+                    resetInactivityTimer(); // Reset timer on every render if authenticated
                     switch (appState.activeView) {
                         case 'dashboard':
                             renderDashboard();
@@ -1127,6 +1189,7 @@
                             renderDashboard(); // Default to dashboard if authenticated
                     }
                 } else {
+                    clearTimeout(inactivityTimeout); // Ensure timer is cleared if not authenticated
                     switch (appState.activeView) {
                         case 'login':
                             renderLogin();
@@ -1233,6 +1296,11 @@
                 const memo = appState.memos.find(m => m.id === appState.activeMemoId);
                 if (memo) {
                     memo.data = JSON.parse(JSON.stringify(appState.activeFormData));
+                    memo.history.push({
+                        timestamp: new Date().toISOString(),
+                        userId: appState.currentUserName,
+                        action: 'Draf Disimpan'
+                    });
                     showModal('Draf Disimpan', 'Nota Anda telah berhasil disimpan sebagai draf.');
                     renderDashboard(); // Go back to dashboard after saving
                 }
@@ -1252,6 +1320,11 @@
                             { name: 'Peninjau B', reviewed: false, decision: null, comment: null, highlightedAspects: [] }
                         ];
                     }
+                    memo.history.push({
+                        timestamp: new Date().toISOString(),
+                        userId: appState.currentUserName,
+                        action: 'Diajukan'
+                    });
                     
                     showModal('Nota Diajukan', 'Nota Anda telah berhasil diajukan untuk ditinjau.');
                     renderDashboard();
@@ -1297,6 +1370,12 @@
                 } else {
                     memo.status = 'Dalam Tinjauan'; // Still pending review from others
                 }
+
+                memo.history.push({
+                    timestamp: new Date().toISOString(),
+                    userId: appState.currentUserName,
+                    action: `Diperbarui oleh Peninjau (${currentReviewer.decision})`
+                });
                 
                 showModal('Tinjauan Disimpan', 'Tinjauan Anda telah berhasil disimpan.');
                 renderDashboard();
