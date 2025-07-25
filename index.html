@@ -817,7 +817,7 @@
                             results.data.forEach(row => {
                                 tableHtml += `<tr class="border-t border-slate-100">`;
                                 results.meta.fields.forEach(field => {
-                                    tableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
+                                    rawTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
                                 });
                                 tableHtml += `</tr>`;
                             });
@@ -998,19 +998,19 @@
                                                     results.meta.fields.forEach(field => {
                                                         rawDataTableHtml += `<th class="px-2 py-1 text-left">${field}</th>`;
                                                     });
-                                                    rawDataTableHtml += `</tr></thead><tbody>`;
+                                                    rawTableHtml += `</tr></thead><tbody>`;
 
                                                     // Table Body
                                                     results.data.forEach(row => {
-                                                        rawDataTableHtml += `<tr class="border-t border-slate-100">`;
+                                                        rawTableHtml += `<tr class="border-t border-slate-100">`;
                                                         results.meta.fields.forEach(field => {
-                                                            rawDataTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
+                                                            rawTableHtml += `<td class="px-2 py-1">${row[field]}</td>`;
                                                         });
-                                                        rawDataTableHtml += `</tr>`;
+                                                        rawTableHtml += `</tr>`;
                                                     });
-                                                    rawDataTableHtml += `</tbody></table></div>`;
+                                                    rawTableHtml += `</tbody></table></div>`;
                                                 } else {
-                                                    rawDataTableHtml = `<p class="text-sm text-slate-500">Tidak ada data mentah untuk ditampilkan.</p>`;
+                                                    rawTableHtml = `<p class="text-sm text-slate-500">Tidak ada data mentah untuk ditampilkan.</p>`;
                                                 }
                                             },
                                             error: function(error) {
@@ -1050,7 +1050,8 @@
                                     <textarea id="reviewer-comment" class="w-full h-32 p-2 border border-slate-300 rounded-md focus:ring-cyan-500 focus:border-cyan-500" placeholder="Berikan komentar Anda...">${(memo.reviewers.find(r => r.name === appState.currentUserName)?.comment) || ''}</textarea>
                                 </div>
                                 <div class="mb-6">
-                                    <label for="reviewer-decision" class="block w-full p-2 border border-slate-300 rounded-md focus:ring-cyan-500 focus:border-cyan-500">
+                                    <label for="reviewer-decision" class="block text-slate-700 text-sm font-bold mb-2">Keputusan</label>
+                                    <select id="reviewer-decision" class="block w-full p-2 border border-slate-300 rounded-md focus:ring-cyan-500 focus:border-cyan-500">
                                         <option value="">Pilih Keputusan</option>
                                         <option value="Setuju" ${(memo.reviewers.find(r => r.name === appState.currentUserName)?.decision === 'Setuju') ? 'selected' : ''}>Setuju</option>
                                         <option value="Tolak" ${(memo.reviewers.find(r => r.name === appState.currentUserName)?.decision === 'Tolak') ? 'selected' : ''}>Tolak</option>
